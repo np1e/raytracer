@@ -1,6 +1,12 @@
 import numpy as np
 from PIL import Image
 import math, time, datetime
+from threading import Thread
+import multiprocessing as mp
+from multiprocessing import Pool, Process, Queue
+import concurrent.futures
+import os
+
 
 class World(object):
 
@@ -33,18 +39,28 @@ class World(object):
 
         self.bgColor = bgColor
 
+
+
     def render(self):
         """"""
 
         image = np.zeros((self.wRes, self.hRes, 3), dtype=np.ndarray)
 
+        #with Pool() as pool:
         for y in range(self.hRes):
             for x in range(self.wRes):
-                ray = self._calcRay(x, y, self.camera)
-                color = self._traceRay(0, ray)
-                image[y][x] = color
+                    #pool.apply_async(self._renderPixel, args=(x,y,image))
+                    self._renderPixel(x,y,image)
 
+        #pool.close()
         return image
+
+    def _renderPixel(self, x, y, image):
+
+        ray = self._calcRay(x, y, self.camera)
+
+        color = self._traceRay(0, ray)
+        image[y][x] = color
 
     def _calcRay(self, x, y, camera):
         """ Return a ray through x and y from a camera"""
@@ -114,10 +130,10 @@ class World(object):
         p = ray.origin + hitdist * ray.direction  # intersection point of ray and object
         normal = object.normalAt(p)  # normal of the object
 
-        cin = material.baseColorAt(p)
+        cin = np.array([255,255,255])
 
         # ambient
-        ambient_light = self.ca * material.ambient
+        ambient_light = cin * material.ambient
         cout = ambient_light
 
         for light in self.lights:
@@ -140,17 +156,17 @@ class World(object):
             cout += cin * material.diffuse * cos_phi
 
             # specular
-            cout += cin * material.specular * cos_theta
+            # cout += cin * material.specular * cos_theta
 
             # shadow
             light_ray = Ray(p, l)
             for obj in [o for o in self.objects if o != object]:
                 t = obj.intersectionParameter(light_ray)
                 if t and t > 0:
-                    cout *= 0.8
+                    cout *= 0.6
                     break
 
-        return cout
+        return cout * material.baseColorAt(p)
 
 
 class Ray(object):
@@ -165,8 +181,8 @@ class Ray(object):
 
 class Material(object):
 
-    def __init__(self, color, ambient = 0.3, specular = 0.2, diffuse = 0.5):
-        self.color = color
+    def __init__(self, color, ambient = 0.2, specular = 0.2, diffuse = 0.5):
+        self.color = color / 255.0
         self.ambient = ambient
         self.specular = specular
         self.diffuse = diffuse
@@ -177,7 +193,7 @@ class Material(object):
 class CheckerBoardMaterial(Material):
     def __init__(self):
         super().__init__(np.array([255,255,255]))
-        self.otherColor = np.array([0,0,0])
+        self.otherColor = np.array([0,0,0]) / 255.0
         self.checkSize = 16
 
     def baseColorAt(self, p):
@@ -311,7 +327,7 @@ if __name__ == "__main__":
         Sphere(np.array([25, -20, 100]), 20,
                 Material(color = np.array([0, 0, 255]))),
         Triangle(np.array([-30, -25, 100]), np.array([30, -25, 100]), np.array([0, 30, 100]),
-                Material(np.array([255, 215, 0]))),
+                Material(np.array([255, 255, 0]), specular = 0)),
         Plane(np.array([0,-70,0]), np.array([0, 1, 0]),
                 CheckerBoardMaterial())
     ]
@@ -321,9 +337,9 @@ if __name__ == "__main__":
                     up = np.array([0, -1, 0]),
                     fov = 45)
 
-    lights = [np.array([50, 100, 0])]
+    lights = [np.array([50, 150, 0])]
 
-    world = World(objects, camera, lights)
+    world = World(objects, camera, lights, 500, 500)
 
     pixels = world.render()
     array_to_image(pixels)
