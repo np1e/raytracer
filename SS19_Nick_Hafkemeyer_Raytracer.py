@@ -3,9 +3,7 @@ from PIL import Image
 import math, time, datetime
 from threading import Thread
 import multiprocessing as mp
-from multiprocessing import Pool, Process, Queue
-import concurrent.futures
-import os
+from multiprocessing import Pool
 
 
 class World(object):
@@ -46,13 +44,13 @@ class World(object):
 
         image = np.zeros((self.wRes, self.hRes, 3), dtype=np.ndarray)
 
-        #with Pool() as pool:
-        for y in range(self.hRes):
-            for x in range(self.wRes):
-                    #pool.apply_async(self._renderPixel, args=(x,y,image))
-                    self._renderPixel(x,y,image)
+        with Pool() as pool:
+            for y in range(self.hRes):
+                for x in range(self.wRes):
+                        pool.apply(self._renderPixel, args=(x,y,image))
+                        #self._renderPixel(x,y,image)
 
-        #pool.close()
+        pool.close()
         return image
 
     def _renderPixel(self, x, y, image):
@@ -281,7 +279,7 @@ class Triangle():
             return None
 
     def normalAt(self, p):
-        return normalized(np.cross(self.u, self.v))
+        return normalized(np.cross(self.u, self.v)) * -1
 
 class Camera(object):
 
@@ -327,7 +325,7 @@ if __name__ == "__main__":
         Sphere(np.array([25, -20, 100]), 20,
                 Material(color = np.array([0, 0, 255]))),
         Triangle(np.array([-30, -25, 100]), np.array([30, -25, 100]), np.array([0, 30, 100]),
-                Material(np.array([255, 255, 0]), specular = 0)),
+                Material(np.array([255, 255, 0]), specular=0)),
         Plane(np.array([0,-70,0]), np.array([0, 1, 0]),
                 CheckerBoardMaterial())
     ]
